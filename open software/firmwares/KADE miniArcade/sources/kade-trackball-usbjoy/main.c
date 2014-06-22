@@ -58,11 +58,29 @@ uint8_t old_tbZ=0, old_tbZ_pinc, old_tbZ_pind;
 uint8_t tb=0;
 uint8_t update_cycles = 0;
 
-uint8_t centering = 0;
+uint8_t centering = 1;
 uint8_t sensitivity = 1;
 uint8_t resistance = 1;
 
-int main(void) {
+int16_t xAxis = 0;
+
+void center()
+{
+	if (centering==1&&update_cycles==0)
+	{
+		if (gamepad_state.l_x_axis < 128)
+		{
+			gamepad_state.l_x_axis += resistance;
+		}
+		else if (gamepad_state.l_x_axis > 128)
+		{
+			gamepad_state.l_x_axis -= resistance;
+		}
+	}
+}
+
+int main(void) 
+{
 	// Set clock @ 16Mhz
 	CPU_PRESCALE(0);		
 
@@ -88,7 +106,8 @@ int main(void) {
 	old_tbZ_pinc = PINC; old_tbZ_pind = PIND;
 	
 	// Pins polling and gamepad status updates
-	for (;;) {
+	while (true)
+	{
 		vs_reset_watchdog();				
 		//set default button states - reset direction to centre
 		gamepad_state.direction=8;
@@ -115,123 +134,79 @@ int main(void) {
 		gamepad_state.ps_btn=0x00;		
 
 		//HWB switches the auto-centering and resistance
-		if (!(PIND&0x80)) {
-			centering = 1;
-		} else {
+		if (!(PIND&0x80))
+		{
 			centering = 0;
+		} 
+		else 
+		{
+			centering = 1;
 		}
 
 		//X Axis - Read quadrative state from pins A1 and A2
-		if(!(old_tbX_pinc&0x04) != !(PINC&0x04) || !(old_tbX_pind&0x01) != !(PIND&0x01) ) {		
+		if(!(old_tbX_pinc&0x04) != !(PINC&0x04) || !(old_tbX_pind&0x01) != !(PIND&0x01) )
+		{		
 			tb = 0;
 			if (!(PINC&0x04)){ tb += 1; }
 			if (!(PIND&0x01)){ tb += 2; }
 			
 			//Set X Axis
-			if ( ((tb==0)&&(old_tbX==2)) || ((tb==1)&&(old_tbX==0)) || ((tb==3)&&(old_tbX==1)) || ((tb==2)&&(old_tbX==3)) ){
+			if ( 	((tb==0)&&(old_tbX==2)) || 
+					((tb==1)&&(old_tbX==0)) || 
+					((tb==3)&&(old_tbX==1)) || 
+					((tb==2)&&(old_tbX==3)) )
+			{
+				//Cast to a 16bit int so don't get interger overflow
+				xAxis = (int16_t)gamepad_state.l_x_axis + (int16_t)sensitivity;
+				
 			    //Increase X Axis Position
-				if ((gamepad_state.l_x_axis + sensitivity) < 256) { gamepad_state.l_x_axis += sensitivity; }
-			} else if ( ((tb==0)&&(old_tbX==1)) || ((tb==2)&&(old_tbX==0)) || ((tb==3)&&(old_tbX==2)) || ((tb==1)&&(old_tbX==3)) ){
-			    //Decrease X Axis Position
-				if ((gamepad_state.l_x_axis - sensitivity) > -1) { gamepad_state.l_x_axis -= sensitivity; }
+				if (xAxis <= 255) 
+				{ 
+					gamepad_state.l_x_axis = xAxis;
+				}
+				else
+				{
+					//else set the xAxis to the max
+					gamepad_state.l_x_axis = 255;
+				}
 			}
+			else if ( 	((tb==0)&&(old_tbX==1)) || 
+						((tb==2)&&(old_tbX==0)) || 
+						((tb==3)&&(old_tbX==2)) || 
+						((tb==1)&&(old_tbX==3)) )
+			{
+				//Cast to a 16bit int so don't get interger underflow
+				xAxis = (int16_t)gamepad_state.l_x_axis - (int16_t)sensitivity;
+				
+			     //Decrease X Axis Position
+				if (xAxis >= 0) 
+				{
+					gamepad_state.l_x_axis = xAxis; 
+				}
+				else
+				{
+					//else set the xAxis to the min
+					gamepad_state.l_x_axis = 0;
+				}
+			}
+			else if ( ((tb==1)&&(old_tbX==2)) || ((tb==2)&&(old_tbX==1)) || ((tb==3)&&(old_tbX==0)) || ((tb==0)&&(old_tbX==3)) )
+			{
+				//center();
+			}
+			
 			old_tbX = tb;
-			old_tbX_pinc = PINC; old_tbX_pind = PIND;
-		} else {
-			if (centering==1&&update_cycles==0){
-				if (gamepad_state.l_x_axis < 128){
-					gamepad_state.l_x_axis += resistance;
-				} else if (gamepad_state.l_x_axis > 128){
-					gamepad_state.l_x_axis -= resistance;
-				}
-			}
-		}
-
-		//Y Axis - Read quadrative state from pins A3 and A4
-		if(!(old_tbY_pind&0x02) != !(PIND&0x02) || !(old_tbY_pind&0x04) != !(PIND&0x04) ) {		
-			tb = 0;
-			if (!(PIND&0x02)){ tb += 1; }
-			if (!(PIND&0x04)){ tb += 2; }
-			
-			//Set X Axis
-			if ( ((tb==0)&&(old_tbY==2)) || ((tb==1)&&(old_tbY==0)) || ((tb==3)&&(old_tbY==1)) || ((tb==2)&&(old_tbY==3)) ){
-			    //Increase X Axis Position
-				if ((gamepad_state.l_y_axis + sensitivity) < 256) { gamepad_state.l_y_axis += sensitivity; }
-			} else if ( ((tb==0)&&(old_tbY==1)) || ((tb==2)&&(old_tbY==0)) || ((tb==3)&&(old_tbY==2)) || ((tb==1)&&(old_tbY==3)) ){
-			    //Decrease X Axis Position
-				if ((gamepad_state.l_y_axis - sensitivity) > -1) { gamepad_state.l_y_axis -= sensitivity; }
-			}
-			old_tbY = tb;
-			old_tbY_pinc = PINC; old_tbY_pind = PIND;
-		} else {
-			if (centering==1&&update_cycles==0){
-				if (gamepad_state.l_y_axis < 128){
-					gamepad_state.l_y_axis += resistance;
-				} else if (gamepad_state.l_y_axis > 128){
-					gamepad_state.l_y_axis -= resistance;
-				}
-			}
-		}
-
-		//Z Axis - Read quadrative state from pins A5 and A6
-		if(!(old_tbZ_pind&0x08) != !(PIND&0x08) || !(old_tbZ_pind&0x10) != !(PIND&0x10) ) {		
-			tb = 0;
-			if (!(PIND&0x08)){ tb += 1; }
-			if (!(PIND&0x10)){ tb += 2; }
-			
-			//Set X Axis
-			if ( ((tb==0)&&(old_tbZ==2)) || ((tb==1)&&(old_tbZ==0)) || ((tb==3)&&(old_tbZ==1)) || ((tb==2)&&(old_tbZ==3)) ){
-			    //Increase X Axis Position
-				if ((gamepad_state.r_x_axis + sensitivity) < 256) { gamepad_state.r_x_axis += sensitivity; }
-			} else if ( ((tb==0)&&(old_tbZ==1)) || ((tb==2)&&(old_tbZ==0)) || ((tb==3)&&(old_tbZ==2)) || ((tb==1)&&(old_tbZ==3)) ){
-			    //Decrease X Axis Position
-				if ((gamepad_state.r_x_axis - sensitivity) > -1) { gamepad_state.r_x_axis -= sensitivity; }
-			}
-			old_tbZ = tb;
-			old_tbZ_pinc = PINC; old_tbZ_pind = PIND;
-		} else {
-			if (centering==1&&update_cycles==0){
-				if (gamepad_state.r_x_axis < 128){
-					gamepad_state.r_x_axis += resistance;
-				} else if (gamepad_state.r_x_axis > 128){
-					gamepad_state.r_x_axis -= resistance;
-				}
-			}
-		}
-		
+			old_tbX_pinc = PINC; 
+			old_tbX_pind = PIND;
+		} 
+		else 
+		{
+			center();
+		}		
 		
 		//send inputs every x cycles
 		update_cycles += 1;
-		if (update_cycles > 3){
-
-			//read digital gamepad inputs
-			//Digital
-			//left and right directions
-			if (!(PIND&0x20)) { gamepad_state.direction = 6; }		//A7-left
-			if (!(PIND&0x40)) { gamepad_state.direction = 2; }		//A8-right						
-			
-			//up, down and diagonal directions
-			if (!(PINB&0x01)) {									//A9-up
-				if (!(PIND&0x20)) {								
-					gamepad_state.direction = 7;					//(up-left)
-				}
-				else if (!(PIND&0x40)) {    						
-					gamepad_state.direction = 1;					//(up-right)
-				} else {
-					gamepad_state.direction = 0;					//(up)
-				}		
-			}
-			if (!(PINB&0x02)) {									//A10-down
-				if (!(PIND&0x20)) {								
-					gamepad_state.direction = 5;					//(down-left)
-				}
-				else if (!(PIND&0x40)) {    						
-					gamepad_state.direction = 3;					//(down-right)
-				} else {	
-					gamepad_state.direction = 4;					//(down)
-				}
-			}
-			
+		if (update_cycles > 3)
+		{
 			//digital buttons
 			if(!(PINB&0x04)) { gamepad_state.square_btn=0xff; }	//PIN B1
 			if(!(PINB&0x08)) { gamepad_state.cross_btn=0xff; }		//PIN B2
@@ -247,6 +222,6 @@ int main(void) {
 			vs_send_pad_state();
 			update_cycles = 0;
 		}
-		_delay_ms(0.3);
+		_delay_ms(0.1);
 	}
 }
