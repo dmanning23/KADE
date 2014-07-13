@@ -59,7 +59,7 @@ uint8_t tb=0;
 uint8_t update_cycles = 0;
 
 uint8_t centering = 1;
-uint8_t sensitivity = 1;
+uint8_t sensitivity = 10;
 uint8_t resistance = 1;
 
 int16_t xAxis = 0;
